@@ -216,20 +216,22 @@ export default function MotionStudio() {
       )}
 
       {/* 제어 버튼 */}
-      <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 z-10">
+      <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 z-10 flex items-center gap-x-3">
         <button
           onClick={toggleWebcam}
-          disabled={isLoading || !!error}
+          disabled={isLoading || !poseLandmarker}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-lg transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
         >
           {isLoading ? 'Loading...' : isWebcamRunning ? 'Stop Camera' : 'Start Camera'}
         </button>
 
-        {/* 카메라 전환 버튼 (웹캠 실행 중일 때만 표시) */}
-        {isWebcamRunning && (
+        
+      </div>
+      {/* 카메라 전환 버튼 (웹캠 실행 중일 때만 표시) */}
+      {isWebcamRunning && (
           <button
             onClick={switchCameraFacingMode}
-            className="p-2.5 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out"
+            className="absolute bottom-5 right-5 z-10 p-2.5 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out"
             title="Switch Camera"
           >
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -237,11 +239,9 @@ export default function MotionStudio() {
             </svg>
           </button>
         )}
-      </div>
-
       {/* 오류 메시지 */}
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-600 bg-opacity-80 text-white p-4 z-20">
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 bg-opacity-90 text-white text-sm px-4 py-2 rounded-md shadow-lg z-20">
           <span>Error: {error}</span>
         </div>
       )}
