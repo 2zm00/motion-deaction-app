@@ -12,6 +12,9 @@ export default function MotionStudio() {
   const [error, setError] = useState<string | null>(null)
   const [poseLandmarker, setPoseLandmarker] = useState<PoseLandmarker | null>(null)
   const lastVideoTime = useRef<number>(-1)
+  const animationFrameId = useRef<number | null>(null);
+  // ('user' = 전면, 'environment' = 후면)
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
   const runningMode = "VIDEO"
 
@@ -49,6 +52,7 @@ export default function MotionStudio() {
     return () => {
       if (poseLandmarker) {
         poseLandmarker.close()
+        stopWebcam()
       }
     }
   }, [])
@@ -74,6 +78,12 @@ export default function MotionStudio() {
 
   // 렌더링 루프
   const renderLoop = useCallback(() => {
+    if (!isWebcamRunning || !videoRef.current || !canvasRef.current || !poseLandmarker) {
+      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+      return;
+    }
+
 	const video = videoRef.current;
     const canvas = canvasRef.current;
     const landmarker = poseLandmarker;
@@ -125,25 +135,42 @@ export default function MotionStudio() {
 	  console.error("렌더링 중 오류 발생:", err)
 	}}
     
-    requestAnimationFrame(renderLoop)
-  }, [poseLandmarker])
+    animationFrameId.current = requestAnimationFrame(renderLoop);
+  }, [isWebcamRunning, poseLandmarker])
+
+  const stopWebcam = () => {
+    if (animationFrameId.current) {
+      cancelAnimationFrame(animationFrameId.current);
+      animationFrameId.current = null;
+    }
+    if (videoRef.current?.srcObject) {
+      const stream = videoRef.current.srcObject as MediaStream;
+      stream.getTracks().forEach(track => track.stop());
+      videoRef.current.srcObject = null;
+    }
+    setIsWebcamRunning(false);
+    console.log("Webcam stopped");
+  };
 
   // 웹캠 시작/정지
   const toggleWebcam = async () => {
     if (isWebcamRunning) {
       stopWebcam()
     } else {
-      await startWebcam()
+      await startWebcam(facingMode)
     }
   }
 
-  const startWebcam = async () => {
+  const startWebcam = async (mode: 'user' | 'environment') => {
+    stopWebcam();
+
     try {
       const constraints = {
         video: { 
           width: { ideal: 640 },
           height: { ideal: 480 },
           frameRate: { ideal: 30, max: 60 }, 
+          facingMode: mode
         }
       }
       
@@ -153,21 +180,24 @@ export default function MotionStudio() {
       videoRef.current.srcObject = stream
       await videoRef.current.play()
       setIsWebcamRunning(true)
-      requestAnimationFrame(renderLoop)
+      animationFrameId.current = requestAnimationFrame(renderLoop)
       
     } catch (err) {
       setError("웹캠 접근 권한이 필요합니다")
       setIsWebcamRunning(false)
     }
   }
-
-  const stopWebcam = () => {
-    if (videoRef.current?.srcObject) {
-      const tracks = (videoRef.current.srcObject as MediaStream).getTracks()
-      tracks.forEach(track => track.stop())
-      setIsWebcamRunning(false)
+  const switchCameraFacingMode = async () => {
+    if (isLoading || !poseLandmarker) return; // 로딩 중이거나 모델 준비 안됐으면 중단
+    const newMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newMode);
+    // 웹캠이 실행 중이었다면 즉시 새로운 모드로 다시 시작
+    if (isWebcamRunning) {
+      console.log(`Switching camera to: ${newMode}`);
+      await startWebcam(newMode);
     }
-  }
+  };
+
 
   return (
     <div className="relative w-full aspect-[9/16] landscape:aspect-video md:aspect-auto bg-black rounded-lg overflow-hidden shadow-lg">
@@ -192,8 +222,21 @@ export default function MotionStudio() {
           disabled={isLoading || !!error}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-md shadow-lg transition duration-150 ease-in-out disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          {isWebcamRunning ? "Stop Camera" : "Start Camera"}
+          {isLoading ? 'Loading...' : isWebcamRunning ? 'Stop Camera' : 'Start Camera'}
         </button>
+
+        {/* 카메라 전환 버튼 (웹캠 실행 중일 때만 표시) */}
+        {isWebcamRunning && (
+          <button
+            onClick={switchCameraFacingMode}
+            className="p-2.5 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg shadow-md transition duration-200 ease-in-out"
+            title="Switch Camera"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* 오류 메시지 */}
