@@ -33,7 +33,7 @@ export default function MotionStudio() {
           minPoseDetectionConfidence: 0.5,
           minPosePresenceConfidence: 0.5,
           minTrackingConfidence: 0.5,
-          outputSegmentationMasks: true,
+          outputSegmentationMasks: false,
         })
 
         setPoseLandmarker(newPoseLandmarker)
@@ -106,14 +106,15 @@ export default function MotionStudio() {
         const drawingUtils = new DrawingUtils(ctx)
         results.landmarks.forEach(landmarks => {
           drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
-			color: "#00FF00",
-			lineWidth: 2,
+			color: "#FFFFFF",
+			lineWidth: 5,
 		  })
   
 		  drawingUtils.drawLandmarks(landmarks, {
-			color: "#FF0000",
-			lineWidth: 1,
-			radius: 3,
+			color: "#FFFFFF",
+      fillColor: "#000000",
+			lineWidth: 3,
+			radius: 10,
 		  })
         })
       }
@@ -140,9 +141,9 @@ export default function MotionStudio() {
     try {
       const constraints = {
         video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          frameRate: { ideal: 30 } 
+          width: { ideal: 640 },
+          height: { ideal: 480 },
+          frameRate: { ideal: 30, max: 60 }, 
         }
       }
       
@@ -169,7 +170,7 @@ export default function MotionStudio() {
   }
 
   return (
-    <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+    <div className="relative w-full aspect-[9/16] landscape:aspect-video md:aspect-auto bg-black rounded-lg overflow-hidden shadow-lg">
       <video ref={videoRef} className="absolute inset-0 w-full h-full object-contain" autoPlay playsInline muted />
       
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain" />
