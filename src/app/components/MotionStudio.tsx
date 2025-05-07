@@ -33,9 +33,9 @@ export default function MotionStudio() {
           },
           runningMode,
           numPoses: 2,
-          minPoseDetectionConfidence: 0.5,
-          minPosePresenceConfidence: 0.5,
-          minTrackingConfidence: 0.5,
+          minPoseDetectionConfidence: 0.7,
+          minPosePresenceConfidence: 0.7,
+          minTrackingConfidence: 0.7,
           outputSegmentationMasks: false,
         })
 
@@ -117,14 +117,14 @@ export default function MotionStudio() {
         results.landmarks.forEach(landmarks => {
           drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
 			color: "#FFFFFF",
-			lineWidth: 5,
+			lineWidth: 3,
 		  })
   
 		  drawingUtils.drawLandmarks(landmarks, {
 			color: "#FFFFFF",
       fillColor: "#000000",
-			lineWidth: 3,
-			radius: 10,
+			lineWidth: 2,
+			radius: 5,
 		  })
         })
       }
