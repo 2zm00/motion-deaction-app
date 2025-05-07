@@ -1,4 +1,4 @@
-interface Landmark {
+export interface Landmark {
 	x: number;
 	y: number;
 	z?: number;
@@ -7,7 +7,7 @@ interface Landmark {
 
 
 // 세개의 랜드마크를 사용하여 관절각도를 계산하는 함수
-function calculateAngle(p1: Landmark, p2: Landmark, p3: Landmark): number {
+export function calculateAngle(p1: Landmark, p2: Landmark, p3: Landmark): number {
 	
 	const vec1_x = p1.x - p2.x;
 	const vec1_y = p1.y - p2.y;
@@ -30,7 +30,7 @@ function calculateAngle(p1: Landmark, p2: Landmark, p3: Landmark): number {
 }
 
 
-const PoseLandmarkIds = {
+export const PoseLandmarkIds = {
 	NOSE: 0,
 	LEFT_EYE_INNER: 1,
 	LEFT_EYE: 2,
