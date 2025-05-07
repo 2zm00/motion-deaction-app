@@ -2,11 +2,12 @@
 
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision"
 import { useEffect, useRef, useState, useCallback } from "react"
+import { calculateAngle, PoseLandmarkIds, type Landmark} from '../utils/angleCalculations'
 
 export default function MotionStudio() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
-  
+
   const [isWebcamRunning, setIsWebcamRunning] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -16,7 +17,29 @@ export default function MotionStudio() {
   // ('user' = 전면, 'environment' = 후면)
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
+
   const runningMode = "VIDEO"
+
+  // 각도 계산 변수 추가
+  const [angles, setAngles] = useState<{
+    leftElbow: number | null;
+    rightElbow: number | null;
+    leftShoulder: number | null;
+    rightShoulder: number | null;
+    leftKnee: number | null;
+    rightKnee: number | null;
+    leftHip: number | null;
+    rightHip: number | null;
+  }>({
+    leftElbow: null,
+    rightElbow: null,
+    leftShoulder: null,
+    rightShoulder: null,
+    leftKnee: null,
+    rightKnee: null,
+    leftHip: null,
+    rightHip: null,
+  })
 
   // Pose Landmarker 초기화
   useEffect(() => {
@@ -116,12 +139,68 @@ export default function MotionStudio() {
       // 캔버스 초기화
     ctx.save()
     ctx.clearRect(0, 0, canvas.width, canvas.height)
-	  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-
+    const newAngles = {
+      leftElbow: null, rightElbow:null,
+      leftShoulder: null, rightShoulder: null,
+      leftKnee: null, rightKnee: null,
+      leftHip: null, rightHip: null,
+    }
 
   // 랜드마크 렌더링
   if (results.landmarks && results.landmarks.length > 0) {
+    
+    // 첫 인식체의 랜드마크 각도 계산
+    const detectedPoseLandmarks = results.landmarks[0] as Landmark[];
+
+    // 랜드마크 각도 계산 시작
+    const p = PoseLandmarkIds;
+
+    const leftShoulderPt = detectedPoseLandmarks[p.LEFT_SHOULDER]
+    const rightShoulderPt = detectedPoseLandmarks[p.RIGHT_SHOULDER]
+    const leftElbowPt = detectedPoseLandmarks[p.LEFT_ELBOW]
+    const rightElbowPt = detectedPoseLandmarks[p.RIGHT_ELBOW]
+    const leftWristPt = detectedPoseLandmarks[p.LEFT_WRIST]
+    const rightWristPt = detectedPoseLandmarks[p.RIGHT_WRIST]
+    const leftHipPt = detectedPoseLandmarks[p.LEFT_HIP]
+    const rightHipPt = detectedPoseLandmarks[p.RIGHT_HIP]
+    const leftKneePt = detectedPoseLandmarks[p.LEFT_KNEE]
+    const rightKneePt = detectedPoseLandmarks[p.RIGHT_KNEE]
+    const leftAnklePt = detectedPoseLandmarks[p.LEFT_ANKLE]
+    const rightAnklePt = detectedPoseLandmarks[p.RIGHT_ANKLE]
+
+    // 팔꿈치
+    if (leftShoulderPt && leftElbowPt && leftWristPt){
+      newAngles.leftElbow = calculateAngle(leftShoulderPt, leftElbowPt, leftWristPt);
+    }
+    if (rightShoulderPt && rightElbowPt && rightWristPt){
+      newAngles.rightElbow = calculateAngle(rightShoulderPt, rightElbowPt, rightWristPt);
+    }
+
+    // 어깨
+    if (leftHipPt && leftShoulderPt && leftElbowPt){
+      newAngles.leftShoulder = calculateAngle(leftHipPt, leftShoulderPt, leftElbowPt);
+    }
+    if (rightHipPt && rightShoulderPt && rightElbowPt){
+      newAngles.rightShoulder = calculateAngle(rightHipPt, rightShoulderPt, rightElbowPt);
+    }
+
+    // 무릎
+    if (leftHipPt && leftKneePt && leftAnklePt){
+      newAngles.leftKnee = calculateAngle(leftHipPt, leftKneePt, leftAnklePt);
+    }
+    if (rightHipPt && rightKneePt && rightAnklePt){
+      newAngles.rightKnee = calculateAngle(rightHipPt, rightKneePt, rightAnklePt);
+    }
+
+    // 엉덩이
+    if (leftShoulderPt && leftHipPt && leftKneePt){
+      newAngles.leftHip = calculateAngle(leftShoulderPt, leftHipPt, leftKneePt);
+    }
+    if (rightShoulderPt && rightHipPt && rightKneePt){
+      newAngles.rightHip = calculateAngle(rightShoulderPt, rightHipPt, rightKneePt);
+    }
 
     const drawingUtils = new DrawingUtils(ctx)
     results.landmarks.forEach(landmarks => {
@@ -130,20 +209,24 @@ export default function MotionStudio() {
 			lineWidth: 3,
       })
   
-		  drawingUtils.drawLandmarks(landmarks, {
+      drawingUtils.drawLandmarks(landmarks, {
 			color: "#FFFFFF",
       fillColor: "#000000",
 			lineWidth: 2,
 			radius: 5,
-		  })
-        })
+      })
+      })
       }
+      
+      setAngles(newAngles)
 
       ctx.restore()
       lastVideoTime.current = currentTime
 
     } catch (err) {
-	  console.error("렌더링 중 오류 발생:", err)
+    console.error("렌더링 중 오류 발생:", err)
+    // 에러 발생 시 각도 초기화
+    setAngles({ leftElbow: null, rightElbow: null, leftShoulder: null, rightShoulder: null, leftKnee: null, rightKnee: null, leftHip: null, rightHip: null })
 	}}
     
     animationFrameId.current = requestAnimationFrame(renderLoop);
@@ -267,9 +350,13 @@ export default function MotionStudio() {
 
 
   return (
+  <div className="w-full flex flex-col items-center">
+    <h1 className="text-2xl font-bold mb-6 text-gray-800">
+      Motion Detection App
+    </h1>
+
     <div className="relative w-full aspect-[9/16] landscape:aspect-video md:aspect-auto bg-black rounded-lg overflow-hidden shadow-lg">
       <video ref={videoRef} className="absolute inset-0 w-full h-full object-contain" autoPlay playsInline muted />
-      
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full object-contain" />
 
 	{/* 로딩 */}
@@ -313,5 +400,28 @@ export default function MotionStudio() {
         </div>
       )}
     </div>
+    
+      
+       {/* 각도 표시 UI */}
+      {isWebcamRunning && (
+        <div className="w-full max-w-2xl mt-4 bg-slate-800 text-white p-5 rounded-lg shadow-xl">
+          <h3 className="text-lg font-semibold mb-3 text-center">각도 계산</h3>
+          <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm"> 
+          <div className="flex flex-col items-start space-y-1">
+              {angles.rightShoulder !== null && !isNaN(angles.rightShoulder) && <p>R. Shoulder: {angles.rightShoulder.toFixed(0)}°</p>}
+              {angles.rightElbow !== null && !isNaN(angles.rightElbow) && <p>R. Elbow: {angles.rightElbow.toFixed(0)}°</p>}
+              {angles.rightKnee !== null && !isNaN(angles.rightKnee) && <p>R. Knee: {angles.rightKnee.toFixed(0)}°</p>}
+              {angles.rightHip !== null && !isNaN(angles.rightHip) && <p>R. Hip: {angles.rightHip.toFixed(0)}°</p>}
+            </div>
+            <div className="flex flex-col items-start space-y-1">
+              {angles.leftShoulder !== null && !isNaN(angles.leftShoulder) && <p>L. Shoulder: {angles.leftShoulder.toFixed(0)}°</p>}
+              {angles.leftElbow !== null && !isNaN(angles.leftElbow) && <p>L. Elbow: {angles.leftElbow.toFixed(0)}°</p>}
+              {angles.leftKnee !== null && !isNaN(angles.leftKnee) && <p>L. Knee: {angles.leftKnee.toFixed(0)}°</p>}
+              {angles.leftHip !== null && !isNaN(angles.leftHip) && <p>L. Hip: {angles.leftHip.toFixed(0)}°</p>}
+            </div>
+          </div>
+        </div>
+      )}
+  </div>
   )
 }
