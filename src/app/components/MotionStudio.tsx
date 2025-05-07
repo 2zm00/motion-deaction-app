@@ -28,7 +28,7 @@ export default function MotionStudio() {
         
         const newPoseLandmarker = await PoseLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: "models/pose_landmarker_heavy.task",
+            modelAssetPath: "models/pose_landmarker_full.task",
             delegate: "GPU"
           },
           runningMode,
@@ -78,47 +78,57 @@ export default function MotionStudio() {
 
   // 렌더링 루프
   const renderLoop = useCallback(() => {
+
+    console.log('[RenderLoop] Called. isWebcamRunning', isWebcamRunning, 'PoseLandmarker Ready', !!poseLandmarker)
+
     if (!isWebcamRunning || !videoRef.current || !canvasRef.current || !poseLandmarker) {
-      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+      console.log('[RenderLoop] Early return. Conditions not met.');
+
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
       animationFrameId.current = null;
+      }
       return;
     }
 
 	const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const landmarker = poseLandmarker;
+  const canvas = canvasRef.current;
+  const ctx = canvas.getContext('2d')
 
-    if (!video || !landmarker || !canvas) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) {
-		requestAnimationFrame(renderLoop)
+  if (!ctx) {
+    console.log('[RenderLoop] No canvas context. Requesting next frame.');
+		animationFrameId.current = requestAnimationFrame(renderLoop)
 		return
 	}
 	
 	const currentTime = video.currentTime * 1000 // 초 → 밀리초 변환
-	if (currentTime !== lastVideoTime.current) {
+
+	if (video.readyState >= 2 && currentTime !== lastVideoTime.current) {
 		// 마이크로초 단위 타임스탬프 생성 (MediaPipe 요구사항)
 		const timestamp = Math.floor(performance.now() * 1000) 
 
     try {
       const results = poseLandmarker.detectForVideo(video, timestamp)
       
+      if (!results || !results.landmarks || results.landmarks.length === 0) {
+        console.log('[RenderLoop] No landmarks detected in this frame.')
+      }
       // 캔버스 초기화
-      ctx.save()
-      ctx.clearRect(0, 0, canvas.width, canvas.height)
+    ctx.save()
+    ctx.clearRect(0, 0, canvas.width, canvas.height)
 	  ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
 
 
-      // 랜드마크 렌더링
-      if (results.landmarks) {
-        const drawingUtils = new DrawingUtils(ctx)
-        results.landmarks.forEach(landmarks => {
-          drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
+  // 랜드마크 렌더링
+  if (results.landmarks && results.landmarks.length > 0) {
+
+    const drawingUtils = new DrawingUtils(ctx)
+    results.landmarks.forEach(landmarks => {
+      drawingUtils.drawConnectors(landmarks, PoseLandmarker.POSE_CONNECTIONS, {
 			color: "#FFFFFF",
 			lineWidth: 3,
-		  })
+      })
   
 		  drawingUtils.drawLandmarks(landmarks, {
 			color: "#FFFFFF",
@@ -130,13 +140,38 @@ export default function MotionStudio() {
       }
 
       ctx.restore()
-      lastVideoTime.current = video.currentTime
+      lastVideoTime.current = currentTime
+
     } catch (err) {
 	  console.error("렌더링 중 오류 발생:", err)
 	}}
     
     animationFrameId.current = requestAnimationFrame(renderLoop);
-  }, [isWebcamRunning, poseLandmarker])
+  }, [poseLandmarker, isWebcamRunning])
+
+  useEffect(() => {
+    if (isWebcamRunning && poseLandmarker) {
+      console.log("Starting render loop");
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+      }
+      animationFrameId.current = requestAnimationFrame(renderLoop);
+    } else {
+      console.log("Stopping render loop");
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+      }
+    }
+
+    return () => {
+      if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+        console.log("clean up render loop")
+      }
+    }
+  }, [isWebcamRunning, poseLandmarker, renderLoop])
 
   const stopWebcam = () => {
     if (animationFrameId.current) {
@@ -152,18 +187,10 @@ export default function MotionStudio() {
     console.log("Webcam stopped");
   };
 
-  // 웹캠 시작/정지
-  const toggleWebcam = async () => {
-    if (isWebcamRunning) {
-      stopWebcam()
-    } else {
-      await startWebcam(facingMode)
-    }
-  }
+
 
   const startWebcam = async (mode: 'user' | 'environment') => {
     stopWebcam();
-
     try {
       const constraints = {
         video: { 
@@ -175,22 +202,62 @@ export default function MotionStudio() {
       }
       
       const stream = await navigator.mediaDevices.getUserMedia(constraints)
-      if (!videoRef.current) return
+      
+      if (!videoRef.current || !canvasRef.current) {
+        stream.getTracks().forEach(track => track.stop())
+        return;
+      }
 
       videoRef.current.srcObject = stream
-      await videoRef.current.play()
-      setIsWebcamRunning(true)
-      animationFrameId.current = requestAnimationFrame(renderLoop)
+
+      videoRef.current.onloadedmetadata = async () => {
+        if (!videoRef.current || !canvasRef.current) return;
+        
+        canvasRef.current.width = videoRef.current.videoWidth;
+        canvasRef.current.height = videoRef.current.videoHeight;
+
+        console.log(`Canvas size set : ${canvasRef.current.width} x ${canvasRef.current.height}`)
+        
+        try {
+          await videoRef.current.play()
+          setIsWebcamRunning(true)
+
+          setError(null);
+        } catch (playError) {
+          console.error("Video play error", playError)
+          setError("비디오 재생 실패")
+          stopWebcam()
+        }
+      };
+
+      videoRef.current.onerror = (e) => {
+        console.error("Vdieo element error", e);
+        setError("비디오 로딩 중 오류 발생");
+        stopWebcam()
+      }
       
     } catch (err) {
       setError("웹캠 접근 권한이 필요합니다")
       setIsWebcamRunning(false)
     }
   }
+
+    // 웹캠 시작/정지
+  const toggleWebcam = async () => {
+    if (isLoading || !poseLandmarker) return;
+    if (isWebcamRunning) {
+      stopWebcam()
+    } else {
+      await startWebcam(facingMode)
+    }
+  }
+
   const switchCameraFacingMode = async () => {
-    if (isLoading || !poseLandmarker) return; // 로딩 중이거나 모델 준비 안됐으면 중단
+    if (isLoading || !poseLandmarker) return; 
+
     const newMode = facingMode === 'user' ? 'environment' : 'user';
     setFacingMode(newMode);
+
     // 웹캠이 실행 중이었다면 즉시 새로운 모드로 다시 시작
     if (isWebcamRunning) {
       console.log(`Switching camera to: ${newMode}`);
