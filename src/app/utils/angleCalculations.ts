@@ -29,6 +29,17 @@ export function calculateAngle(p1: Landmark, p2: Landmark, p3: Landmark): number
 	return angleDeg;
 }
 
+export interface AnglesObjectType
+{
+	leftElbow: number | null;
+	rightElbow: number | null;
+	leftShoulder: number | null;
+	rightShoulder: number | null;
+	leftKnee: number | null;
+	rightKnee: number | null;
+	leftHip: number | null;
+	rightHip: number | null;
+};
 
 export const PoseLandmarkIds = {
 	NOSE: 0,

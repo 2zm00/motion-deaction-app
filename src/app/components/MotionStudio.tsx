@@ -2,7 +2,7 @@
 
 import { PoseLandmarker, FilesetResolver, DrawingUtils } from "@mediapipe/tasks-vision"
 import { useEffect, useRef, useState, useCallback } from "react"
-import { calculateAngle, PoseLandmarkIds, type Landmark} from '../utils/angleCalculations'
+import { calculateAngle, PoseLandmarkIds, type Landmark, type AnglesObjectType} from '../utils/angleCalculations'
 
 export default function MotionStudio() {
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -21,16 +21,7 @@ export default function MotionStudio() {
   const runningMode = "VIDEO"
 
   // 각도 계산 변수 추가
-  const [angles, setAngles] = useState<{
-    leftElbow: number | null;
-    rightElbow: number | null;
-    leftShoulder: number | null;
-    rightShoulder: number | null;
-    leftKnee: number | null;
-    rightKnee: number | null;
-    leftHip: number | null;
-    rightHip: number | null;
-  }>({
+  const [angles, setAngles] = useState<AnglesObjectType>({
     leftElbow: null,
     rightElbow: null,
     leftShoulder: null,
@@ -141,7 +132,7 @@ export default function MotionStudio() {
     ctx.clearRect(0, 0, canvas.width, canvas.height)
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
-    const newAngles = {
+    const newAngles: AnglesObjectType = {
       leftElbow: null, rightElbow:null,
       leftShoulder: null, rightShoulder: null,
       leftKnee: null, rightKnee: null,
